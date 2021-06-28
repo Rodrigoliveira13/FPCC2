@@ -1,6 +1,6 @@
 ---
-title: 'Computer Whisperers: Stepwise Regression Analyses'
-author: "Chantel S. Prat, Tara M. Madhyastha, Malayka J. Mottarella, Chu-Hsuan Kuo"
+title: 'Reanálise De FPCC 2'
+author: "Rodrigo Oliveira"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   pdf_document:
@@ -25,10 +25,13 @@ Specifically, the stepwise regression method we chose (ols_step_both_p) builds a
 Finally, Bayesian Information Criterion (BIC) values are reported for every step of the regression analyses for every dependent variable, up to the final model output determined by the stepwise regression. BIC values are also reported for models that include an additional excluded variable on top of the variables included in the final model to allow for comparison with the final model determined by the stepwise regression.
 
 ```{r}
-
-install.packages("data.table")
+install.packages("olsrr")
 ```
 
+```{r}
+library(modelr)
+library(broom)
+```
 
 
 
@@ -36,11 +39,11 @@ install.packages("data.table")
 knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 library(tidyverse, warn.conflicts=FALSE, quietly=TRUE)
 library(knitr)
-library(car)
 library(olsrr)
 ```
+
 ```{r}
-rawdata <- read.csv("Computer_Whisperers_Stepwise_Regression_Data_for_pub.csv") %>%
+dados <- read.csv("Computer_Whisperers_Stepwise_Regression_Data_for_pub.csv") %>%
   filter(EEG_Usability >= 1)
 ```
 
@@ -58,13 +61,50 @@ rawdata <- read.csv("Computer_Whisperers_Stepwise_Regression_Data_for_pub.csv") 
 * Right Fronto-Temporal Beta Power
 
 ```{r, include=FALSE}
-learning_rate <- rawdata[, c("Learning_Rate", "Fluid_Intelligence", "Language_Aptitude", "Numeracy", 
-                             "Working_Memory_Updating", "Working_Memory_Span", "Right_FrontoTemporal_Beta_Power")] %>% na.omit()
+learning_rate <- rawdata[, c("Learning_Rate", "Fluid_Intelligence", "Language_Aptitude", "Numeracy", "Working_Memory_Updating", "Working_Memory_Span", "Right_FrontoTemporal_Beta_Power")] %>% na.omit()
 ```
 
-## Stepwise Regression: Predicting Learning Rate
-
 All six (6) predictors are entered into the stepwise regression. The final model consists of Fluid Intelligence, Right Fronto-Temporal Beta Power, and Numeracy.
+
+```{r}
+dados %>% 
+  ggplot(aes(x = Learning_Rate, y = Fluid_Intelligence)) +
+  geom_point(alpha = 1) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  ggtitle("Correlacionamento entre Taxa de Aprendizagem e Inteligência Fluída") + 
+  xlab("Taxa de Aprendizagem") + 
+  ylab("Inteligência Fluida")
+```
+
+```{r}
+dados %>% 
+  ggplot(aes(x = Learning_Rate, y = Language_Aptitude)) +
+  geom_point(alpha = 1) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  ggtitle("Correlacionamento entre Taxa de Aprendizagem e Linguagem de Aptidão") + 
+  xlab("Taxa de Aprendizagem") + 
+  ylab("Linguagem de Aptidão")
+```
+```{r}
+dados %>% 
+  ggplot(aes(x = Learning_Rate, y = Right_FrontoTemporal_Low_Gamma_Power)) +
+  geom_point(alpha = 1) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  ggtitle("Cor. entre Taxa de Apren. e Baixa Freq. Gama no Fronto Temp. Dir.") + 
+  xlab("Taxa de Aprendizagem") + 
+  ylab("Baixa Freqência Gama no Fronto Temporal Direito")
+```
+```{r}
+dados %>% 
+  ggplot(aes(x = Learning_Rate, y = Numeracy)) +
+  geom_point(alpha = 1) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  ggtitle("Correlação entre Taxa de Aprendizagem e Numeramento") + 
+  xlab("Taxa de Aprendizagem") + 
+  ylab("Numeramento")
+```
+
+
 
 ```{r, echo=FALSE}
 learning_rate_model <- lm(Learning_Rate ~ ., data = learning_rate)
@@ -76,125 +116,21 @@ learning_rate_model_summary <- ols_step_both_p(learning_rate_model, details = T)
 m1 through m4 are models produced by each step of the stepwise regression, with m4 being the final model with the best BIC value. m5a (+ Working Memory Span) and m5b (+ Working Memory Updating) are models that include an additional variable on top of the variables included in the final model; they have worse BIC values compared to m4.
 
 ```{r, echo=FALSE}
-m1_LR <- lm(Learning_Rate ~ Language_Aptitude, learning_rate)
-m2_LR <- lm(Learning_Rate ~ Language_Aptitude + Fluid_Intelligence, learning_rate)
-m3_LR <- lm(Learning_Rate ~ Language_Aptitude + Fluid_Intelligence + Right_FrontoTemporal_Beta_Power, learning_rate)
 m4_LR <- lm(Learning_Rate ~ Language_Aptitude + Fluid_Intelligence + Right_FrontoTemporal_Beta_Power + Numeracy, learning_rate)
-m5a_LR <- lm(Learning_Rate ~ Language_Aptitude + Fluid_Intelligence + Right_FrontoTemporal_Beta_Power + Numeracy + Working_Memory_Span, learning_rate)
-m5b_LR <- lm(Learning_Rate ~ Language_Aptitude + Fluid_Intelligence + Right_FrontoTemporal_Beta_Power + Numeracy + Working_Memory_Updating, learning_rate)
-kable(BIC(m1_LR, m2_LR, m3_LR, m4_LR, m5a_LR, m5b_LR))
+
+tidy (m4_LR, conf.int = TRUE)
+glance (m4_LR)
 ```
 
-```{r, include=FALSE}
-#These summaries were used to obtain R squared and p-values for models m5a and m5b.
-summary(m5a_LR)
-summary(m5b_LR)
+
+```{r}
+tidy(m4_LR, conf.int = TRUE, exponentiate = TRUE) %>% 
+  filter(term!= "(Intercept)") %>% 
+  ggplot(aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_point() + 
+  geom_linerange() + 
+  ggtitle("IC das variáveis preditoras") + 
+  coord_flip()
 ```
 
-\pagebreak
 
-# DV #2: Programming Accuracy
-
-## Predictors:
-
-* Fluid Intelligence
-* Language Aptitude
-* Numeracy 
-* Working Memory Updating 
-* Working Memory Span
-* Left Posterior Beta Coherence
-* Left Posterior Theta Coherence
-
-```{r, include=FALSE}
-prog_accuracy <- rawdata[, c("Programming_Accuracy", "Fluid_Intelligence", "Language_Aptitude", "Numeracy",
-                             "Working_Memory_Updating", "Working_Memory_Span", "Left_Posterior_Beta_Coherence",
-                             "Left_Posterior_Theta_Coherence")] %>% na.omit()
-```
-
-## Stepwise Regression: Predicting Programming Accuracy
-
-All seven (7) predictors are entered into the stepwise regression. The final model consists of Fluid Intelligence, Language Aptitude, and Working Memory Updating.
-
-```{r, echo=FALSE}
-prog_accuracy_model <- lm(Programming_Accuracy ~ ., data = prog_accuracy)
-prog_accuracy_model_summary <- ols_step_both_p(prog_accuracy_model, details = T)
-```
-
-## Obtaining Bayesian Information Criterion Values
-
-m1 through m3 are models produced by each step of the stepwise regression, with m3 being the final model with the best BIC value. m4a (+ Numeracy), m4b (+ Working Memory Span), m4c (+ Left Posterior Beta Coherence), and m4d (+ Left Posterior Theta Coherence) are models that include an additional variable on top of the variables included in the final model; they have worse BIC values compared to m3.
-
-```{r, echo=FALSE}
-m1_PA <- lm(Programming_Accuracy ~ Fluid_Intelligence, prog_accuracy)
-m2_PA <- lm(Programming_Accuracy ~ Fluid_Intelligence + Language_Aptitude, prog_accuracy)
-m3_PA <- lm(Programming_Accuracy ~ Fluid_Intelligence + Language_Aptitude + Working_Memory_Updating, prog_accuracy)
-m4a_PA <- lm(Programming_Accuracy ~ Fluid_Intelligence + Language_Aptitude + Working_Memory_Updating + Numeracy, prog_accuracy)
-m4b_PA <- lm(Programming_Accuracy ~ Fluid_Intelligence + Language_Aptitude + Working_Memory_Updating + Working_Memory_Span, prog_accuracy)
-m4c_PA <- lm(Programming_Accuracy ~ Fluid_Intelligence + Language_Aptitude + Working_Memory_Updating + Left_Posterior_Beta_Coherence, prog_accuracy)
-m4d_PA <- lm(Programming_Accuracy ~ Fluid_Intelligence + Language_Aptitude + Working_Memory_Updating + Left_Posterior_Theta_Coherence, prog_accuracy)
-kable(BIC(m1_PA, m2_PA, m3_PA, m4a_PA, m4b_PA, m4c_PA, m4d_PA))
-```
-
-```{r, include=FALSE}
-#These summaries were used to obtain R squared and p-values for models m4a through m4d.
-summary(m4a_PA)
-summary(m4b_PA)
-summary(m4c_PA)
-summary(m4d_PA)
-```
-
-\pagebreak
-
-# DV #3: Declarative Knowledge
-
-## Predictors:
-
-* Fluid Intelligence 
-* Language Aptitude 
-* Numeracy
-* Working Memory Updating 
-* Inhibitory Control 
-* Vocabulary 
-* Right Posterior Low Gamma Power
-* Right Fronto-Temporal Gamma Power
-
-```{r, include=FALSE}
-declarative <- rawdata[, c("Declarative_Knowledge", "Fluid_Intelligence", "Language_Aptitude", "Numeracy",
-                           "Working_Memory_Updating", "Inhibitory_Control", "Vocabulary", 
-                           "Right_Posterior_Low_Gamma_Power", "Right_FrontoTemporal_Low_Gamma_Power")] %>% na.omit()
-```
-
-## Stepwise Regression: Predicting Declarative Knowledge
-
-All eight (8) predictors are entered into the stepwise regression. The final model consists of Fluid Intelligence and Right Fronto-Temporal Gamma Power.
-
-```{r, echo=FALSE}
-dec_knowledge_model <- lm(Declarative_Knowledge ~ ., data = declarative)
-dec_knowledge_model_summary <- ols_step_both_p(dec_knowledge_model, details = T)
-```
-
-## Obtaining Bayesian Information Criterion Values
-
-m1 and m2 are models produced by each step of the stepwise regression, with m2 being the final model with the best BIC value. m3a (+ Language Aptitude), m3b (+ Numeracy), m3c (+ Working Memory Updating), m3d (+ Inhibitory Control), m3e (+ Vocabulary), and m3f (+ Right Posterior Low Gamma Power) are models that include an additional variable on top of the variables included in the final model; they have worse BIC values compared to m2.
-
-```{r, echo=FALSE}
-m1_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence, declarative)
-m2_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence + Right_FrontoTemporal_Low_Gamma_Power, declarative)
-m3a_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence + Right_FrontoTemporal_Low_Gamma_Power + Language_Aptitude, declarative)
-m3b_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence + Right_FrontoTemporal_Low_Gamma_Power + Numeracy , declarative)
-m3c_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence + Right_FrontoTemporal_Low_Gamma_Power + Working_Memory_Updating, declarative)
-m3d_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence + Right_FrontoTemporal_Low_Gamma_Power + Inhibitory_Control, declarative)
-m3e_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence + Right_FrontoTemporal_Low_Gamma_Power + Vocabulary, declarative)
-m3f_DK <- lm(Declarative_Knowledge ~ Fluid_Intelligence + Right_FrontoTemporal_Low_Gamma_Power + Right_Posterior_Low_Gamma_Power, declarative)
-kable(BIC(m1_DK, m2_DK, m3a_DK, m3b_DK, m3c_DK, m3d_DK, m3e_DK, m3f_DK))
-```
-
-```{r, include=FALSE}
-#These summaries were used to obtain R squared and p-values for models m3a through m3f.
-summary(m3a_DK)
-summary(m3b_DK)
-summary(m3c_DK)
-summary(m3d_DK)
-summary(m3e_DK)
-summary(m3f_DK)
-```
